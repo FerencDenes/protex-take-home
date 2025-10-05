@@ -1,0 +1,26 @@
+FROM ubuntu:22.04
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    curl \
+    git \
+    iputils-ping \
+    supervisor
+
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 1
+
+COPY device/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+WORKDIR /app
+
+COPY certs/ ./certs/
+COPY device/requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt || true
+
+COPY device ./device
+RUN chmod 0555 device/start_monitoring.sh
+
+CMD ["/usr/bin/supervisord", "-n"]
