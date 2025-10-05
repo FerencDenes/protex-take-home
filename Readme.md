@@ -112,7 +112,7 @@ The handlers are separated from the db related logic.
 
 ## Frontend
 
-Simple React based frontend to demonstrate the functionality in Typescript. It can fetch the list of devices, show the latest metrics of the selected device and display the few latest metric values of the selected measure.
+Simple React based frontend to demonstrate the functionality in Typescript. It can fetch the list of devices, show the latest metrics of the selected device and display the few latest metric values of the selected measure. The metrics data (the latest as well as the timeseries) is refreshed at a 5 minute interval.
 
 To start for http://localhost:5173/
 
@@ -121,6 +121,10 @@ cd frontend
 npm i
 npm run dev
 ```
+
+### Internals
+
+The refresh is fetched by the client. There is no sync protocol. In case of refresh all the data is fetched again.
 
 # Alternatives considered
 
@@ -166,35 +170,47 @@ Now the API uses plain HTTP
 
 # Further improvements, limitations
 
-GPU not tested.
-
-API's business logic is not separated from the handlers.
-
-Device setup. Now I have simply added the certificate to the device manually
+## General
 
 Proper logging
 
-Separation of certificates
+Automated testing
 
-Testing
-
-DB purging (the data keeps growing), there should be a retention period or some kind of compaction of the data
+Separation of certificates between devices and the collector server
 
 Picking a DB that is good at storing, handling time series data
 
 Creating proper indices to optimize the database
 
-Checking the incoming data's validity
-
 Scalability: the service should be able to handle 100s of devices
 However one might create a topic scheme where the metrics publishing is sharded along with the db. Each device sends their data to the topic of their shard, the data is stored in that shard in the DB. We must make sure that the picked shard remains static. In this case we can have multiple collectors dealing with some shards.
 
+## MMetric capture and publish
+
+GPU not tested.
+
+Device setup. Now I have simply added the certificate to the device manually
+
+Now all the devices send monitoring metrics at once in practice. It would be great to shift with a random delay so we do not overload the network at once from several devices.
+
+## Metrics collection
+
+DB purging (the data keeps growing), there should be a retention period or some kind of compaction of the data
+
+Checking the incoming data's validity
+
+## API
+
+API's business logic is not separated from the handlers.
+
+HTTPS
+
 Authentication for the API and the frontend
 
-Periodic refresh of the frontend
+## Frontend
 
-Styling of the frontend
+Styling, so it looks nice
 
 Pagination is implemented on the API, however the frontend is not able to fetch more pages.
 
-Now all the devices send monitoring metrics at once in practice. It would be great to shift with a random delay so we do not overload the network at once from several devices.
+The frontend's metric refresh could be incremental relying on the limit parameters. This would cause less burden on the backend.

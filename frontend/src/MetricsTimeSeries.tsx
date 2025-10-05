@@ -9,11 +9,14 @@ interface Props {
   metricKey: string;
 }
 
+const REFRESH_MS = Number((import.meta as any).env?.VITE_REFRESH_MS ?? 5000);
+
 export function MetricsTimeSeries(props: Props) {
   const [metrics, setMetrics] = useState<
     { timestamp: number; value: number }[] | null
   >(null);
   useEffect(() => {
+    let cancelled = false;
     async function fetchData() {
       try {
         const metricsValuesRes = await fetch(
@@ -22,6 +25,7 @@ export function MetricsTimeSeries(props: Props) {
           }/metrics/${props.metricKey.replaceAll("/", "_-_")}/timeseries`
         );
         const data = (await metricsValuesRes.json()) as MetricsValuesData;
+        if (cancelled) return;
         console.log(data);
         setMetrics(
           data.metric_values.map((dataPoint) => ({
@@ -30,10 +34,15 @@ export function MetricsTimeSeries(props: Props) {
           }))
         );
       } catch {
-        setMetrics(null);
+        if (!cancelled) setMetrics(null);
       }
     }
     void fetchData();
+    const id = window.setInterval(fetchData, REFRESH_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
   }, [props.deviceId, props.metricKey]);
 
   const formatTime = (timestamp: number) =>

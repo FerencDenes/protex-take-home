@@ -9,26 +9,35 @@ interface Props {
   deviceId: string;
 }
 
+const REFRESH_MS = Number((import.meta as any).env?.VITE_REFRESH_MS ?? 5000);
+
 export function LatestMetrics(props: Props) {
   const [metrics, setMetrics] = useState<LatestMetricsData["metrics"] | null>(
     null
   );
   const [timestamp, setTimestamp] = useState(0);
   useEffect(() => {
+    let cancelled = false;
     async function fetchData() {
       try {
         const devicesRes = await fetch(
           `http://localhost:8000/api/v1/devices/${props.deviceId}/metrics/latest`
         );
         const data = (await devicesRes.json()) as LatestMetricsData;
+        if (cancelled) return;
         console.log(data);
         setMetrics(data.metrics);
         setTimestamp(data.timestamp);
       } catch {
-        setMetrics(null);
+        if (!cancelled) setMetrics(null);
       }
     }
     void fetchData();
+    const id = window.setInterval(fetchData, REFRESH_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
   }, [props.deviceId]);
 
   const formattedTime = timestamp
