@@ -2,60 +2,53 @@ import paho.mqtt.client as mqtt
 import ssl
 import json
 import time
+import os
+from pathlib import Path
+import logging
 from db_manager import DatabaseManager
 
-# TODO make conf
-AWS_IOT_ENDPOINT = "a3j514h4zjsng3-ats.iot.eu-north-1.amazonaws.com"
-PORT = 8883
-TOPIC = "devices/+/monitoring"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+CERTS_DIR = Path(os.getenv("CERTS_DIR", REPO_ROOT / "certs"))
 
-# TODO centralise
-CA_PATH = "../certs/root-CA.crt"
-CERT_PATH = "../certs/edge_device_01.cert.pem"
-KEY_PATH = "../certs/edge_device_01.private.key"
+AWS_IOT_ENDPOINT = os.getenv("AWS_IOT_ENDPOINT", "a3j514h4zjsng3-ats.iot.eu-north-1.amazonaws.com")
+PORT = int(os.getenv("AWS_IOT_PORT", "8883"))
+TOPIC = os.getenv("AWS_IOT_TOPIC", "devices/+/monitoring")
+
+CA_PATH = os.getenv("AWS_IOT_CA_PATH", str(CERTS_DIR / "root-CA.crt"))
+CERT_PATH = os.getenv("AWS_IOT_CERT_PATH", str(CERTS_DIR / "edge_device_01.cert.pem"))
+KEY_PATH = os.getenv("AWS_IOT_KEY_PATH", str(CERTS_DIR / "edge_device_01.private.key"))
 
 db: DatabaseManager
 def on_connect(client, userdata, flags, rc, properties=None):
     client.subscribe(TOPIC)
-    print(f"Subscribed to {TOPIC}")
+    logging.info(f"Subscribed to {TOPIC}")
 
-def construct_metric_key(prefix, key):
-    if prefix == "":
-        return key
+def iter_flatten(prefix, value):
+    if isinstance(value, dict):
+        for k, v in value.items():
+            new_prefix = f"{prefix}-{k}" if prefix else k
+            yield from iter_flatten(new_prefix, v)
+    elif isinstance(value, list):
+        for i, v in enumerate(value):
+            new_prefix = f"{prefix}-{i}" if prefix else str(i)
+            yield from iter_flatten(new_prefix, v)
     else:
-        return prefix + "-" + key
-
-def handle_metric(timestamp, device_id, metric_prefix, metric_value):
-    if isinstance(metric_value, dict):
-        for metric_key in metric_value:
-            handle_metric(
-                timestamp,
-                device_id,
-                construct_metric_key(metric_prefix, metric_key),
-                metric_value[metric_key])
-    elif isinstance(metric_value, list):
-        for index in range(len(metric_key)):
-            handle_metric(
-                timestamp,
-                device_id,
-                construct_metric_key(metric_prefix, index),
-                metric_value[index]
-            )
-    else:
-        key = metric_prefix
-        print(f"Metric {key}, {metric_value}")
-        db.add_metric(timestamp, device_id, key, metric_value)
+        yield (prefix, value)
 
 def process_message(message):
     timestamp = int(message["timestamp"])
     device_id = message["device"]
-    handle_metric(timestamp, device_id, "", message["metrics"])
+    metrics = message.get("metrics", {})
+    for key, value in iter_flatten("", metrics):
+        logging.debug(f"Metric {key} = {value}")
+        try:
+            db.add_metric(timestamp, device_id, key, float(value))
+        except Exception as e:
+            logging.error(f"Failed to persist metric {key}: {e}")
 
 def on_message(client, userdata, msg):
     try:
         payload = json.loads(msg.payload.decode())
-        print(f"Topic: {msg.topic}")
-        print(f"Message: {json.dumps(payload, indent=2)}")
         process_message(payload)
     except json.JSONDecodeError as e:
         print(f"Error decoding message: {e}")
@@ -86,7 +79,6 @@ def collect_metrics():
     try:
         print("Connecting to AWS IoT...")
         client.connect(AWS_IOT_ENDPOINT, PORT, keepalive=60)
-        print("Starting MQTT loop...")
         client.loop_forever()
     except Exception as e:
         print(f"Error occurred: {str(e)}")

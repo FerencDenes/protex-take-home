@@ -11,6 +11,15 @@ def get_db():
         g.db = DatabaseManager()
     return g.db
 
+@http_server.teardown_appcontext
+def close_db(exception=None):
+    db = g.pop("db", None)
+    if db is not None:
+        try:
+            db.close()
+        except Exception:
+            pass
+
 @http_server.get("/api/v1/devices")
 def devices_list():
     try:

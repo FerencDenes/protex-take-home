@@ -66,6 +66,15 @@ class DatabaseManager:
             timestamp = metrics[0][2]
             return {'timestamp': timestamp, 'metrics': { metric[0]: metric[1] for metric in metrics}}
 
-    def __del__(self):
+    def close(self):
         if self.conn:
-            self.conn.close()
+            try:
+                self.conn.close()
+            except sqlite3.Error as e:
+                print(f"Database close error: {e}")
+
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass

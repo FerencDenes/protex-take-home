@@ -12,12 +12,11 @@ There are four components in the system
 
 <img width="1600" height="900" alt="image" src="https://github.com/user-attachments/assets/3dc9f808-3e01-47c0-be94-b83bacb292eb" />
 
-
 ## Environment
 
 All the below should be started from the project's top level directory.
 
-I have used the certificates, server address from my own IoT Core setup for communication.
+I have used the certificates, server address from my own AWS IoT Core setup for communication.
 
 In order to run the solution you should have the certifications: https://docs.aws.amazon.com/iot/latest/developerguide/device-certs-create.html
 
@@ -29,22 +28,31 @@ Move the certificates to the `certs` directory with names
 
 These files will be picked up by the devices and the metrics collector.
 
-Make sure you use your own IoT Core server's address (`AWS_IOT_ENDPOINT`)
-
 ## Metric capture and publish
 
 Runs in a docker container. This will let us mimic the ubuntu environment easily as well as run several of edge devices. Written in python in the `device` directory.
 
 ```bash
 docker build -t edge-device -f ./device/Dockerfile.device .
-docker run -e <device name> -d edge-device
+docker run -e CLIENT_ID=<device name> -e AWS_IOT_ENDPOINT=<Your AWS IoT Core address> -d edge-device
 ```
 
 You can issue multiple `docker run ...` to have multiple edge devices.
 
+You can run it locally as well
+
+```bash
+python3 -m venv device/.venv
+source ./device/.venv/bin/activate
+pip3 install --no-cache-dir -r ./device/requirements.txt
+export CLIENT_ID=edge_device_03 && export AWS_IOT_ENDPOINT=<Your AWS IoT Core address> && python3 device/monitoring.py
+```
+
 ### Communication
 
 Collects data and sends it via MQTT QoS 1 periodically. This ensures scalability and delivery to the broker.
+
+The solution is integrated with AWS IoT Core
 
 ## Data collector
 
@@ -104,7 +112,15 @@ The handlers are separated from the db related logic.
 
 ## Frontend
 
-Simple React based frontend to demonstrate the functionality. It can fetch the list of devices, show the latest metrics of the selected device and display the few latest metric values of the selected measure.
+Simple React based frontend to demonstrate the functionality in Typescript. It can fetch the list of devices, show the latest metrics of the selected device and display the few latest metric values of the selected measure.
+
+To start for http://localhost:5173/
+
+```bash
+cd frontend
+npm i
+npm run dev
+```
 
 # Alternatives considered
 
@@ -165,6 +181,9 @@ Testing
 DB purging (the data keeps growing), there should be a retention period or some kind of compaction of the data
 
 Picking a DB that is good at storing, handling time series data
+
+Creating proper indices to optimize the database
+
 Checking the incoming data's validity
 
 Scalability: the service should be able to handle 100s of devices
@@ -177,3 +196,5 @@ Periodic refresh of the frontend
 Styling of the frontend
 
 Pagination is implemented on the API, however the frontend is not able to fetch more pages.
+
+Now all the devices send monitoring metrics at once in practice. It would be great to shift with a random delay so we do not overload the network at once from several devices.

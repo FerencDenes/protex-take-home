@@ -8,16 +8,21 @@ import pynvml
 from scheduler import Scheduler
 import datetime
 import os
+from pathlib import Path
 
-# TODO make it configurable
-AWS_IOT_ENDPOINT = "a3j514h4zjsng3-ats.iot.eu-north-1.amazonaws.com"
-PORT = 8883
+# Configuration
+AWS_IOT_ENDPOINT = os.getenv("AWS_IOT_ENDPOINT", "a3j514h4zjsng3-ats.iot.eu-north-1.amazonaws.com")
+PORT = int(os.getenv("AWS_IOT_PORT", "8883"))
 CLIENT_ID = os.getenv("CLIENT_ID")
-TOPIC = "devices/" + CLIENT_ID + "/monitoring"
+TOPIC = f"devices/{CLIENT_ID}/monitoring"
 
-CA_PATH = "./certs/root-CA.crt"
-CERT_PATH = "./certs/edge_device_01.cert.pem"
-KEY_PATH = "./certs/edge_device_01.private.key"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+CERTS_DIR = Path(os.getenv("CERTS_DIR", REPO_ROOT / "certs"))
+CA_PATH = os.getenv("AWS_IOT_CA_PATH", str(CERTS_DIR / "root-CA.crt"))
+CERT_PATH = os.getenv("AWS_IOT_CERT_PATH", str(CERTS_DIR / "edge_device_01.cert.pem"))
+KEY_PATH = os.getenv("AWS_IOT_KEY_PATH", str(CERTS_DIR / "edge_device_01.private.key"))
+
+METRICS_INTERVAL_SECONDS = int(os.getenv("METRICS_INTERVAL_SECONDS", "15"))
 
 def collect_metrics():
     payload = {}
@@ -35,7 +40,7 @@ def collect_metrics():
         for deviceNum in range(handleNum):
             handle = pynvml.nvmlDeviceGetHandleByIndex(deviceNum)
             util = pynvml.nvmlDeviceGetUtilizationRates(handle)
-            temperature = pynvml.nvmlDeviceGetTemperature(handle)
+            temperature = pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
             gpu_usages.append({
                 "gpu_utilization": util.gpu,
                 "memory_utilization": util.memory,
@@ -85,7 +90,6 @@ def send_metrics(client: mqtt.Client, metrics):
         if not connected_flag.wait(timeout=10):
             raise RuntimeError("Failed to connect within timeout period")
 
-        print("Successfully connected, publishing metrics...")
         payload = {
             "metrics": metrics,
             "timestamp": int(time.time()),
@@ -108,9 +112,15 @@ def report(client: mqtt.Client):
     metrics = collect_metrics()
     send_metrics(client, metrics)
 
-client = create_client()
-schedule = Scheduler()
-schedule.cyclic(datetime.timedelta(seconds=15), lambda: report(client))
-while True:
-    schedule.exec_jobs()
-    time.sleep(1)
+def main():
+    client = create_client()
+    schedule = Scheduler()
+    schedule.cyclic(datetime.timedelta(seconds=METRICS_INTERVAL_SECONDS), lambda: report(client))
+    while True:
+        schedule.exec_jobs()
+        time.sleep(1)
+
+if __name__ == "__main__":
+    if not CLIENT_ID:
+        raise RuntimeError("CLIENT_ID environment variable is required")
+    main()
