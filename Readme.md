@@ -10,6 +10,9 @@ There are four components in the system
 
 4. Frontend application
 
+<img width="1600" height="900" alt="image" src="https://github.com/user-attachments/assets/3dc9f808-3e01-47c0-be94-b83bacb292eb" />
+
+
 ## Environment
 
 All the below should be started from the project's top level directory.
