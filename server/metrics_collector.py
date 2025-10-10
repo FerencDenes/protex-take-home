@@ -4,7 +4,6 @@ import json
 import time
 import os
 from pathlib import Path
-import logging
 from db_manager import DatabaseManager
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -21,7 +20,7 @@ KEY_PATH = os.getenv("AWS_IOT_KEY_PATH", str(CERTS_DIR / "edge_device_01.private
 db: DatabaseManager
 def on_connect(client, userdata, flags, rc, properties=None):
     client.subscribe(TOPIC)
-    logging.info(f"Subscribed to {TOPIC}")
+    print(f"Subscribed to {TOPIC}")
 
 def iter_flatten(prefix, value):
     if isinstance(value, dict):
@@ -40,11 +39,10 @@ def process_message(message):
     device_id = message["device"]
     metrics = message.get("metrics", {})
     for key, value in iter_flatten("", metrics):
-        logging.debug(f"Metric {key} = {value}")
         try:
             db.add_metric(timestamp, device_id, key, float(value))
         except Exception as e:
-            logging.error(f"Failed to persist metric {key}: {e}")
+            print(f"Failed to persist metric {key}: {e}")
 
 def on_message(client, userdata, msg):
     try:

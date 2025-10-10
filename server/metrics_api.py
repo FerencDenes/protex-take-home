@@ -26,7 +26,7 @@ def devices_list():
         limit = request.args.get("limit", 50, type=int)
         offset = request.args.get("offset", 0, type=int)
         db = get_db()
-        devices = g.db.get_devices(limit=limit, offset=offset)
+        devices = db.get_devices(limit=limit, offset=offset)
         return devices, 200, {"Content-Type": "application/json"}
     except Exception as e:
         return {"error": str(e)}, 500, {"Content-Type": "application/json"}

@@ -9,7 +9,7 @@ interface Props {
   metricKey: string;
 }
 
-const REFRESH_MS = Number((import.meta as any).env?.VITE_REFRESH_MS ?? 5000);
+const REFRESH_MS = 5000; // 5s
 
 export function MetricsTimeSeries(props: Props) {
   const [metrics, setMetrics] = useState<
@@ -26,7 +26,6 @@ export function MetricsTimeSeries(props: Props) {
         );
         const data = (await metricsValuesRes.json()) as MetricsValuesData;
         if (cancelled) return;
-        console.log(data);
         setMetrics(
           data.metric_values.map((dataPoint) => ({
             timestamp: dataPoint[0],

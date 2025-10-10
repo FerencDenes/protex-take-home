@@ -25,31 +25,36 @@ KEY_PATH = os.getenv("AWS_IOT_KEY_PATH", str(CERTS_DIR / "edge_device_01.private
 METRICS_INTERVAL_SECONDS = int(os.getenv("METRICS_INTERVAL_SECONDS", "15"))
 
 def collect_metrics():
-    payload = {}
-    payload["cpuUsage"] = psutil.cpu_percent(percpu=False, interval=1.0)
-    payload["diskUsage"] = {partition.mountpoint: psutil.disk_usage(partition.mountpoint).percent 
-                 for partition in psutil.disk_partitions(all=False)}
-    payload["diskUsage"]["/"] = psutil.disk_usage("/").percent
-    memory_data = psutil.virtual_memory()
-    payload["memoryUsage"] = memory_data.percent
-
     try:
-        pynvml.nvmlInit()
-        handleNum = pynvml.nvmlDeviceGetCount()
-        gpu_usages = []
-        for deviceNum in range(handleNum):
-            handle = pynvml.nvmlDeviceGetHandleByIndex(deviceNum)
-            util = pynvml.nvmlDeviceGetUtilizationRates(handle)
-            temperature = pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
-            gpu_usages.append({
-                "gpu_utilization": util.gpu,
-                "memory_utilization": util.memory,
-                "temperature": temperature,
-            })
-        pynvml.nvmlShutdown()
-        payload["gpu_usages"] = gpu_usages
-    except:
-        print("Failed to collect GPU stats, possibly no GPUs")
+        payload = {}
+        payload["cpuUsage"] = psutil.cpu_percent(percpu=False, interval=1.0)
+        
+        payload["diskUsage"] = {partition.mountpoint: psutil.disk_usage(partition.mountpoint).percent 
+                    for partition in psutil.disk_partitions(all=False)}
+        payload["diskUsage"]["/"] = psutil.disk_usage("/").percent
+        memory_data = psutil.virtual_memory()
+        payload["uptime"] = time.time() - psutil.boot_time()
+        payload["memoryUsage"] = memory_data.percent
+
+        try:
+            pynvml.nvmlInit()
+            handleNum = pynvml.nvmlDeviceGetCount()
+            gpu_usages = []
+            for deviceNum in range(handleNum):
+                handle = pynvml.nvmlDeviceGetHandleByIndex(deviceNum)
+                util = pynvml.nvmlDeviceGetUtilizationRates(handle)
+                temperature = pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
+                gpu_usages.append({
+                    "gpu_utilization": util.gpu,
+                    "memory_utilization": util.memory,
+                    "temperature": temperature,
+                })
+            pynvml.nvmlShutdown()
+            payload["gpu_usages"] = gpu_usages
+        except Exception as e:
+            print(f"Failed to collect GPU stats, possibly no GPUs {e}")
+    except Exception as e:
+        print(f"Failed to collect metrics {e}")
     return payload
 
 connected_flag = threading.Event()

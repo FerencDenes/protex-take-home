@@ -9,7 +9,7 @@ interface Props {
   deviceId: string;
 }
 
-const REFRESH_MS = Number((import.meta as any).env?.VITE_REFRESH_MS ?? 5000);
+const REFRESH_MS = 5000; // 5s
 
 export function LatestMetrics(props: Props) {
   const [metrics, setMetrics] = useState<LatestMetricsData["metrics"] | null>(
@@ -25,7 +25,6 @@ export function LatestMetrics(props: Props) {
         );
         const data = (await devicesRes.json()) as LatestMetricsData;
         if (cancelled) return;
-        console.log(data);
         setMetrics(data.metrics);
         setTimestamp(data.timestamp);
       } catch {
@@ -62,7 +61,11 @@ export function LatestMetrics(props: Props) {
                 <tr key={metric[0]}>
                   <td>{metric[0].split("-")[0]}</td>
                   <td>{metric[0].split("-")[1]}</td>
-                  <td>{metric[1]}</td>
+                  <td>
+                    {metric[0] === "uptime"
+                      ? ` ${Math.floor(metric[1] / (24 * 3600))} days`
+                      : metric[1]}
+                  </td>
                 </tr>
               ))}
             </tbody>
